@@ -63,6 +63,7 @@ model User {
 
   memberships    OrganizationMember[]
   issuedInvoices Invoice[]
+  refreshTokens RefreshToken[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -183,4 +184,13 @@ model InvoiceItem {
 
   @@index([invoiceId])
   @@index([productId])
+}
+
+model RefreshToken {
+  id String @id @default(uuid())
+  token String @unique
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createAt DateTime @default(now())
 }

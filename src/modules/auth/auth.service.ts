@@ -2,6 +2,7 @@ import { AppError } from "../../utils/appError.js";
 import prisma from "../../lib/prisma.js";
 import { comparePassword, hashPassword } from "../../utils/password.js";
 import { signToken } from "../../utils/jwt.js";
+import jwt from "jsonwebtoken";
 
 interface RegisterInput {
   email: string;
@@ -18,7 +19,7 @@ interface LoginInput {
 
 export const registerUser = async (input: RegisterInput) => {
   const { email, password, firstName, lastName, nationalId } = input;
-  const jwtSecret = process.env.JWT_SECRET;
+  const jwtSecret = process.env.JWT_SECRET_KEY;
 
   if (!jwtSecret) {
     throw new AppError("JWT_SECRET is not configured properly", 500);
@@ -34,35 +35,62 @@ export const registerUser = async (input: RegisterInput) => {
 
   const hashedPassword = await hashPassword(password);
 
-  const user = await prisma.user.create({
-    data: {
-      email,
-      password: hashedPassword,
-      firstName,
-      lastName,
-      nationalId: nationalId ?? null,
-    },
-  });
+  return await prisma.$transaction(async (tx) => {
+    const user = await tx.user.create({
+      data: {
+        email,
+        password: hashedPassword,
+        firstName,
+        lastName,
+        nationalId: nationalId ?? null,
+      },
+    });
 
-  const token = signToken({
-    userId: user.id,
-    email: user.email,
-    systemRole: user.systemRole,
-  });
+    // AccessToken
+    const accessToken = signToken(
+      {
+        userId: user.id,
+        email: user.email,
+        systemRole: user.systemRole,
+      },
+      "15m" 
+    );
 
-  return {
-    user: {
-      id: user.id,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      systemRole: user.systemRole,
-    },
-    token,
-  };
+    // RefreshToken
+    const refreshToken = jwt.sign(
+      { userId: user.id }, 
+      jwtSecret,
+      { expiresIn: "7d" }
+    );
+
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
+
+    await tx.refreshToken.create({
+      data: {
+        token: refreshToken,
+        userId: user.id,
+        expiresAt,
+      },
+    });
+
+    const { password: _, ...userWithoutPassword } = user;
+
+    return {
+      user: userWithoutPassword,
+      accessToken,
+      refreshToken,
+    };
+  });
 };
 
 export const loginUser = async (input: LoginInput) => {
+  const jwtSecret = process.env.JWT_SECRET_KEY;
+
+  if (!jwtSecret) {
+    throw new AppError("JWT_SECRET is not configured properly", 500);
+  }
+
   const { email, password } = input;
 
   if (!email || !password) {
@@ -83,20 +111,39 @@ export const loginUser = async (input: LoginInput) => {
     throw new AppError("Invalid email or password", 401);
   }
 
-  const token = signToken({
-    userId: user.id,
-    email: user.email,
-    systemRole: user.systemRole,
-  });
-
-  return {
-    user: {
-      id: user.id,
+ // AccessToken
+  const accessToken = signToken(
+    {
+      userId: user.id,
       email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
       systemRole: user.systemRole,
     },
-    token,
+    "15m" 
+  );
+
+  // RefreshToken
+  const refreshToken = jwt.sign(
+    { userId: user.id },
+    jwtSecret,
+    { expiresIn: "7d" }
+  );
+
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 7);
+
+  await prisma.refreshToken.create({
+    data: {
+      token: refreshToken,
+      userId: user.id,
+      expiresAt,
+    },
+  });
+
+  const { password: _, ...userWithoutPassword } = user;
+
+  return {
+    user: userWithoutPassword,
+    accessToken,
+    refreshToken,
   };
 };
