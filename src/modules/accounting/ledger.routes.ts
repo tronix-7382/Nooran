@@ -1,0 +1,10 @@
+import { Router } from "express";
+import { authenticate } from "../../middlewares/authenticate.js";
+import { getAccountLedgerController, getJournalEntryController, listAccountsController, listJournalEntriesController } from "./ledger.controller.js";
+const router = Router();
+router.use(authenticate);
+router.get("/organizations/:organizationId/accounts", listAccountsController);
+router.get("/organizations/:organizationId/accounts/:accountId/ledger", getAccountLedgerController);
+router.get("/organizations/:organizationId/journal-entries", listJournalEntriesController);
+router.get("/organizations/:organizationId/journal-entries/:entryId", getJournalEntryController);
+export default router;

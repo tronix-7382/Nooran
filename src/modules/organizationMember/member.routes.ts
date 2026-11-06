@@ -1,0 +1,13 @@
+import { Router } from "express";
+import { authenticate } from "../../middlewares/authenticate.js";
+import { validate } from "../../middlewares/validate.middleware.js";
+import { addMemberController, deactivateMemberController, listMembersController, transferOwnershipController, updateMemberController } from "./member.controller.js";
+import { addMemberSchema, transferOwnershipSchema, updateMemberSchema } from "./member.validation.js";
+const router = Router();
+router.use(authenticate);
+router.get("/organizations/:organizationId/members", listMembersController);
+router.post("/organizations/:organizationId/members", validate(addMemberSchema), addMemberController);
+router.post("/organizations/:organizationId/transfer-ownership", validate(transferOwnershipSchema), transferOwnershipController);
+router.patch("/organizations/:organizationId/members/:memberId", validate(updateMemberSchema), updateMemberController);
+router.delete("/organizations/:organizationId/members/:memberId", deactivateMemberController);
+export default router;

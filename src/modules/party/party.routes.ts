@@ -1,0 +1,13 @@
+import { Router } from "express";
+import { authenticate } from "../../middlewares/authenticate.js";
+import { validate } from "../../middlewares/validate.middleware.js";
+import { createPartyController, deletePartyController, getPartyController, listPartiesController, updatePartyController } from "./party.controller.js";
+import { createPartySchema, updatePartySchema } from "./party.validation.js";
+const router = Router();
+router.use(authenticate);
+router.post("/organizations/:organizationId/parties", validate(createPartySchema), createPartyController);
+router.get("/organizations/:organizationId/parties", listPartiesController);
+router.get("/organizations/:organizationId/parties/:partyId", getPartyController);
+router.patch("/organizations/:organizationId/parties/:partyId", validate(updatePartySchema), updatePartyController);
+router.delete("/organizations/:organizationId/parties/:partyId", deletePartyController);
+export default router;

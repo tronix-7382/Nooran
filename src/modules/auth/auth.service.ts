@@ -1,8 +1,7 @@
 import { AppError } from "../../utils/appError.js";
 import prisma from "../../lib/prisma.js";
 import { comparePassword, hashPassword } from "../../utils/password.js";
-import { signToken } from "../../utils/jwt.js";
-import jwt from "jsonwebtoken";
+import { signRefreshToken, signToken } from "../../utils/jwt.js";
 
 interface RegisterInput {
   email: string;
@@ -57,11 +56,7 @@ export const registerUser = async (input: RegisterInput) => {
     );
 
     // RefreshToken
-    const refreshToken = jwt.sign(
-      { userId: user.id }, 
-      jwtSecret,
-      { expiresIn: "7d" }
-    );
+    const refreshToken = signRefreshToken(user.id);
 
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7);
@@ -105,6 +100,8 @@ export const loginUser = async (input: LoginInput) => {
     throw new AppError("Invalid email or password", 401);
   }
 
+  if (!user.isActive) throw new AppError("User account is disabled", 401);
+
   const isPasswordCorrect = await comparePassword(password, user.password);
 
   if (!isPasswordCorrect) {
@@ -122,11 +119,7 @@ export const loginUser = async (input: LoginInput) => {
   );
 
   // RefreshToken
-  const refreshToken = jwt.sign(
-    { userId: user.id },
-    jwtSecret,
-    { expiresIn: "7d" }
-  );
+  const refreshToken = signRefreshToken(user.id);
 
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + 7);

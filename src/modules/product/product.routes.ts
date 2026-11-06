@@ -1,0 +1,13 @@
+import { Router } from "express";
+import { authenticate } from "../../middlewares/authenticate.js";
+import { validate } from "../../middlewares/validate.middleware.js";
+import { createProductController, deleteProductController, getProductController, listProductsController, updateProductController } from "./product.controller.js";
+import { createProductSchema, updateProductSchema } from "./product.validation.js";
+const router = Router();
+router.use(authenticate);
+router.post("/organizations/:organizationId/products", validate(createProductSchema), createProductController);
+router.get("/organizations/:organizationId/products", listProductsController);
+router.get("/organizations/:organizationId/products/:productId", getProductController);
+router.patch("/organizations/:organizationId/products/:productId", validate(updateProductSchema), updateProductController);
+router.delete("/organizations/:organizationId/products/:productId", deleteProductController);
+export default router;

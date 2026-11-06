@@ -1,10 +1,19 @@
-import {logger} from "./utils/logger.js";
+import { env } from "./config/env.js";
+import { logger } from "./utils/logger.js";
 import app from "./app.js";
-import dotenv from "dotenv";
+import prisma from "./lib/prisma.js";
 
-dotenv.config();
-
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  logger.info(`🚀 Server running on http://localhost:${PORT}`);
+const server = app.listen(env.PORT, () => {
+  logger.info(`Server running on port ${env.PORT}`);
 });
+
+const shutdown = (signal: string) => {
+  logger.info(`Received ${signal}; closing server`);
+  server.close(() => {
+    void prisma.$disconnect().finally(() => process.exit(0));
+  });
+  setTimeout(() => process.exit(1), 10_000).unref();
+};
+
+process.on("SIGINT", () => shutdown("SIGINT"));
+process.on("SIGTERM", () => shutdown("SIGTERM"));

@@ -1,0 +1,13 @@
+import { Router } from "express";
+import { authenticate } from "../../middlewares/authenticate.js";
+import { validate } from "../../middlewares/validate.middleware.js";
+import { createInvoiceItemController, deleteInvoiceItemController, getInvoiceItemController, listInvoiceItemsController, updateInvoiceItemController } from "./invoiceItem.controller.js";
+import { createInvoiceItemSchema, updateInvoiceItemSchema } from "./invoiceItem.validation.js";
+const router = Router();
+router.use(authenticate);
+router.post("/organizations/:organizationId/invoices/:invoiceId/items", validate(createInvoiceItemSchema), createInvoiceItemController);
+router.get("/organizations/:organizationId/invoices/:invoiceId/items", listInvoiceItemsController);
+router.get("/organizations/:organizationId/invoices/:invoiceId/items/:itemId", getInvoiceItemController);
+router.patch("/organizations/:organizationId/invoices/:invoiceId/items/:itemId", validate(updateInvoiceItemSchema), updateInvoiceItemController);
+router.delete("/organizations/:organizationId/invoices/:invoiceId/items/:itemId", deleteInvoiceItemController);
+export default router;

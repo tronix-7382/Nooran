@@ -1,0 +1,10 @@
+import { asyncHandler, requestOrganizationId, requestPagination, requestResourceId, requestUserId } from "../shared/module.helpers.js";
+import resMessage from "../../utils/resMes.js";
+import { createInvoiceItem, deleteInvoiceItem, getInvoiceItem, listInvoiceItems, updateInvoiceItem } from "./invoiceItem.service.js";
+const org = (req: Parameters<typeof requestOrganizationId>[0]) => requestOrganizationId(req);
+const invoiceId = (req: Parameters<typeof requestOrganizationId>[0]) => requestResourceId(req, "invoiceId");
+export const listInvoiceItemsController = asyncHandler(async (req, res) => res.status(200).json(resMessage(true, "Invoice items retrieved successfully", await listInvoiceItems(requestUserId(req), org(req), invoiceId(req), requestPagination(req)))));
+export const getInvoiceItemController = asyncHandler(async (req, res) => res.status(200).json(resMessage(true, "Invoice item retrieved successfully", await getInvoiceItem(requestUserId(req), org(req), invoiceId(req), requestResourceId(req, "itemId")))));
+export const createInvoiceItemController = asyncHandler(async (req, res) => res.status(201).json(resMessage(true, "Invoice item created successfully", await createInvoiceItem(requestUserId(req), org(req), invoiceId(req), req.body))));
+export const updateInvoiceItemController = asyncHandler(async (req, res) => res.status(200).json(resMessage(true, "Invoice item updated successfully", await updateInvoiceItem(requestUserId(req), org(req), invoiceId(req), requestResourceId(req, "itemId"), req.body))));
+export const deleteInvoiceItemController = asyncHandler(async (req, res) => { await deleteInvoiceItem(requestUserId(req), org(req), invoiceId(req), requestResourceId(req, "itemId")); res.status(200).json(resMessage(true, "Invoice item deleted successfully")); });

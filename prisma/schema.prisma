@@ -35,6 +35,35 @@ enum InvoiceStatus {
   CANCELLED
 }
 
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  CARD
+  OTHER
+}
+
+enum PaymentStatus {
+  ACTIVE
+  REVERSED
+}
+
+enum StockMovementType {
+  PURCHASE_IN
+  SALE_OUT
+  ADJUSTMENT_IN
+  ADJUSTMENT_OUT
+  REVERSAL_IN
+  REVERSAL_OUT
+}
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  REVENUE
+  EXPENSE
+}
+
 model Organization {
   id      String  @id @default(uuid())
   name    String
@@ -47,6 +76,12 @@ model Organization {
   products Product[]
   batches  Batch[]
   invoices Invoice[]
+  payments Payment[]
+  stockMovements StockMovement[]
+  journalEntries JournalEntry[]
+  invoiceSequences InvoiceSequence[]
+  accounts Account[]
+  journalLines JournalLine[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -60,10 +95,18 @@ model User {
   lastName   String
   nationalId String?    @unique
   systemRole SystemRole @default(USER)
+  isActive   Boolean    @default(true)
+  phone      String?    @unique
+  phoneVerifiedAt DateTime?
 
   memberships    OrganizationMember[]
   issuedInvoices Invoice[]
   refreshTokens RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
+  phoneVerificationCodes PhoneVerificationCode[]
+  payments Payment[]
+  stockMovements StockMovement[]
+  journalEntries JournalEntry[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -103,6 +146,7 @@ model Party {
 
   @@unique([organizationId, phone])
   @@index([organizationId])
+  @@unique([id, organizationId])
 }
 
 model Product {
@@ -116,12 +160,14 @@ model Product {
   organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   batches      Batch[]
   invoiceItems InvoiceItem[]
+  stockMovements StockMovement[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([organizationId, sku])
   @@index([organizationId])
+  @@unique([id, organizationId])
 }
 
 model Batch {
@@ -135,8 +181,9 @@ model Batch {
   expireDate        DateTime?
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  product      Product      @relation(fields: [productId], references: [id])
-  invoice      Invoice      @relation(fields: [invoiceId], references: [id])
+  product      Product      @relation(fields: [productId, organizationId], references: [id, organizationId])
+  invoice      Invoice      @relation(fields: [invoiceId, organizationId], references: [id, organizationId])
+  stockMovements StockMovement[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -144,6 +191,7 @@ model Batch {
   @@index([organizationId])
   @@index([productId])
   @@index([invoiceId])
+  @@unique([id, organizationId, productId])
 }
 
 model Invoice {
@@ -154,14 +202,20 @@ model Invoice {
   invoiceNumber   String
   type            InvoiceType   @default(PURCHASE)
   totalAmount     Decimal       @default(0) @db.Decimal(14, 2)
+  discountAmount Decimal @default(0) @db.Decimal(14, 2)
+  taxAmount Decimal @default(0) @db.Decimal(14, 2)
+  otherCharges Decimal @default(0) @db.Decimal(14, 2)
+  currencyCode String @default("IRR") @db.VarChar(3)
   status          InvoiceStatus @default(DRAFT)
 
   organization Organization @relation(fields: [organizationId], references: [id])
-  party        Party        @relation(fields: [partyId], references: [id])
+  party        Party        @relation(fields: [partyId, organizationId], references: [id, organizationId])
   createdBy    User         @relation(fields: [createdByUserId], references: [id])
 
   batches Batch[]
   items   InvoiceItem[]
+  payments Payment[]
+  stockMovements StockMovement[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -170,20 +224,24 @@ model Invoice {
   @@index([organizationId])
   @@index([partyId])
   @@index([createdByUserId])
+  @@unique([id, organizationId])
 }
 
 model InvoiceItem {
-  id        String  @id @default(uuid())
-  invoiceId String
-  productId String
-  quantity  Decimal @db.Decimal(12, 3)
-  unitPrice Decimal @db.Decimal(12, 2)
+  id             String  @id @default(uuid())
+  organizationId String
+  invoiceId      String
+  productId      String
+  quantity       Decimal @db.Decimal(12, 3)
+  unitPrice      Decimal @db.Decimal(12, 2)
 
-  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  product Product @relation(fields: [productId], references: [id])
+  invoice Invoice @relation(fields: [invoiceId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  product Product @relation(fields: [productId, organizationId], references: [id, organizationId])
+  stockMovements StockMovement[]
 
-  @@index([invoiceId])
-  @@index([productId])
+  @@index([invoiceId, organizationId])
+  @@index([productId, organizationId])
+  @@unique([id, organizationId, invoiceId, productId])
 }
 
 model RefreshToken {
@@ -193,4 +251,129 @@ model RefreshToken {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   expiresAt DateTime
   createAt DateTime @default(now())
+}
+
+model PasswordResetToken {
+  id String @id @default(uuid())
+  tokenHash String @unique
+  userId String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+}
+
+model PhoneVerificationCode {
+  id String @id @default(uuid())
+  userId String @unique
+  phone String
+  codeHash String
+  attempts Int @default(0)
+  expiresAt DateTime
+  lastSentAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([phone])
+  @@index([expiresAt])
+}
+
+model InvoiceSequence {
+  id String @id @default(uuid())
+  organizationId String
+  year Int
+  type InvoiceType
+  nextNumber Int @default(1)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  @@unique([organizationId, year, type])
+}
+
+model Payment {
+  id String @id @default(uuid())
+  organizationId String
+  invoiceId String
+  createdByUserId String
+  amount Decimal @db.Decimal(14, 2)
+  method PaymentMethod
+  reference String?
+  status PaymentStatus @default(ACTIVE)
+  reversedAt DateTime?
+  reversalReason String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invoice Invoice @relation(fields: [invoiceId, organizationId], references: [id, organizationId])
+  createdBy User @relation(fields: [createdByUserId], references: [id])
+  @@index([invoiceId, organizationId])
+  @@index([createdByUserId])
+}
+
+model Account {
+  id String @id @default(uuid())
+  organizationId String
+  code String
+  name String
+  type AccountType
+  isSystem Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lines JournalLine[]
+  @@unique([organizationId, code])
+  @@unique([id, organizationId])
+}
+
+model JournalEntry {
+  id String @id @default(uuid())
+  organizationId String
+  sourceType String
+  sourceId String
+  description String
+  currencyCode String @db.VarChar(3)
+  transactionDate DateTime @default(now())
+  createdByUserId String
+  createdAt DateTime @default(now())
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  createdBy User @relation(fields: [createdByUserId], references: [id], onDelete: Restrict)
+  lines JournalLine[]
+  @@unique([organizationId, sourceType, sourceId])
+  @@unique([id, organizationId])
+  @@index([organizationId, transactionDate])
+}
+
+model JournalLine {
+  id String @id @default(uuid())
+  organizationId String
+  journalEntryId String
+  accountId String
+  debit Decimal @default(0) @db.Decimal(14, 2)
+  credit Decimal @default(0) @db.Decimal(14, 2)
+  createdAt DateTime @default(now())
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  entry JournalEntry @relation(fields: [journalEntryId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  account Account @relation(fields: [accountId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  @@index([organizationId, accountId, createdAt])
+  @@index([journalEntryId, organizationId])
+}
+
+model StockMovement {
+  id String @id @default(uuid())
+  organizationId String
+  productId String
+  batchId String
+  invoiceId String
+  invoiceItemId String
+  createdByUserId String
+  type StockMovementType
+  quantity Decimal @db.Decimal(12, 3)
+  unitCost Decimal? @db.Decimal(12, 2)
+  unitPrice Decimal? @db.Decimal(12, 2)
+  createdAt DateTime @default(now())
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  product Product @relation(fields: [productId, organizationId], references: [id, organizationId])
+  batch Batch @relation(fields: [batchId, organizationId, productId], references: [id, organizationId, productId])
+  invoice Invoice @relation(fields: [invoiceId, organizationId], references: [id, organizationId])
+  invoiceItem InvoiceItem @relation(fields: [invoiceItemId, organizationId, invoiceId, productId], references: [id, organizationId, invoiceId, productId])
+  createdBy User @relation(fields: [createdByUserId], references: [id])
+  @@index([organizationId, productId, createdAt])
+  @@index([batchId, createdAt])
+  @@index([invoiceId, organizationId])
 }

@@ -1,0 +1,11 @@
+import { Router } from "express";
+import { authenticate } from "../../middlewares/authenticate.js";
+import { validate } from "../../middlewares/validate.middleware.js";
+import { createPaymentController, listPaymentsController, reversePaymentController } from "./payment.controller.js";
+import { createPaymentSchema, reversePaymentSchema } from "./payment.validation.js";
+const router = Router();
+router.use(authenticate);
+router.get("/organizations/:organizationId/invoices/:invoiceId/payments", listPaymentsController);
+router.post("/organizations/:organizationId/invoices/:invoiceId/payments", validate(createPaymentSchema), createPaymentController);
+router.post("/organizations/:organizationId/payments/:paymentId/reverse", validate(reversePaymentSchema), reversePaymentController);
+export default router;

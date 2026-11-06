@@ -10,6 +10,8 @@ export const authorize = (...allowedRoles: string[]) => {
         .json(resMessage(false, "Unauthorized Access"));
     }
 
+    // HELPER has no implicit platform-wide access. It may only use organization data
+    // when the user also has an active OrganizationMember record for that tenant.
     if (!allowedRoles.includes(req.user.systemRole)) {
       return res
         .status(HTTP_STATUS.FORBIDDEN)

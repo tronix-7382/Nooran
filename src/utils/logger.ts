@@ -1,30 +1,39 @@
+import "dotenv/config";
+import { mkdirSync } from "node:fs";
 import winston from "winston";
+import { env } from "../config/env.js";
 
-const { combine, timestamp, printf, colorize, json } = winston.format;
+mkdirSync("logs", { recursive: true });
 
-const consoleFormat = printf(({ level, message, timestamp }) => {
-  return `${timestamp} [${level}]: ${message}`;
+const { combine, timestamp, printf, colorize, json, errors } = winston.format;
+
+const consoleFormat = printf(({ level, message, stack }) => {
+  return `[${level}]: ${stack || message}`;
 });
 
 export const logger = winston.createLogger({
-  level: process.env.NODE_ENV === "production" ? "info" : "debug",
+  level: env.NODE_ENV === "production" ? "info" : "debug",
+  format: combine(
+    errors({ stack: true }),
+    timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
+  ),
   transports: [
     new winston.transports.File({
       filename: "logs/error.log",
       level: "error",
-      format: combine(timestamp(), json()),
+      format: json(),
     }),
     new winston.transports.File({
       filename: "logs/combined.log",
-      format: combine(timestamp(), json()),
+      format: json(),
     }),
   ],
 });
 
-if (process.env.NODE_ENV !== "production") {
+if (env.NODE_ENV !== "production") {
   logger.add(
     new winston.transports.Console({
-      format: combine(colorize(), timestamp(), consoleFormat),
+      format: combine(colorize(), consoleFormat),
     }),
   );
 }
